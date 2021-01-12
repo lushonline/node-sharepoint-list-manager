@@ -1,0 +1,48 @@
+{
+  "name": "node-sharepoint-list-manager",
+  "version": "0.0.0",
+  "description": "Tool to connect to a Sharepoint List and manage the items",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/martinholden-skillsoft/node-sharepoint-list-manager.git"
+  },
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./app.js",
+    "lint": "eslint **/*.js",
+    "preversion": "npm run lint",
+    "postversion": "git push && git push --tags && npm run changelog && git push ",
+    "postinstall": "",
+    "changelog": "rimraf CHANGELOG.md && auto-changelog --template keepachangelog && git add . && git commit . -m changelog && git push"
+  },
+  "keywords": [],
+  "author": "martinholden-skillsoft &lt;12408585+martinholden-skillsoft@users.noreply.github.com&gt;",
+  "license": "MIT",
+  "dependencies": {
+    "access-safe": "^0.1.0",
+    "axios": "^0.21.1",
+    "config": "^3.3.2",
+    "dotenv-safe": "^8.2.0",
+    "gd-sprest": "^6.2.7",
+    "json-stringify-safe": "^5.0.1",
+    "lodash": "^4.17.20",
+    "mkdirp": "^1.0.4",
+    "moment": "^2.29.0",
+    "node-sp-auth": "^3.0.1",
+    "odata-filter-builder": "^1.0.0",
+    "promise-retry": "^2.0.1",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {
+    "auto-changelog": "^2.2.1",
+    "babel-eslint": "^10.0.2",
+    "eslint": "^7.17.0",
+    "eslint-config-airbnb-base": "^14.1.0",
+    "eslint-config-prettier": "^7.1.0",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-prettier": "^3.3.1",
+    "prettier": "^2.1.2",
+    "rimraf": "^3.0.2"
+  }
+}
