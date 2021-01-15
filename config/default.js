@@ -21,9 +21,14 @@ config.output.filename = defer((cfg) => {
 });
 
 config.sharepoint = {};
+// Sharepoint Site Url
 config.sharepoint.url = null;
+// Sharepoint Username
 config.sharepoint.username = null;
+// Sharepoint Password
 config.sharepoint.password = null;
+// Sharepoint List Title
+config.sharepoint.list = null;
 
 // Global Web Retry Options for promise retry
 // see https://github.com/IndigoUnited/node-promise-retry#readme

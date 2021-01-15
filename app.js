@@ -6,6 +6,7 @@ const Path = require('path');
 const _ = require('lodash');
 const mkdirp = require('mkdirp');
 const stringifySafe = require('json-stringify-safe');
+const { accessSafe } = require('access-safe');
 
 const { transports } = require('winston');
 const spauth = require('node-sp-auth');
@@ -95,9 +96,36 @@ const main = async (configOptions) => {
   };
 
   await sharepoint
+    .getContextInfo(options)
+    .then((response) => {
+      options.sharepoint.authheaders['X-RequestDigest'] = accessSafe(
+        () => response.data.d.GetContextWebInformation.FormDigestValue,
+        null
+      );
+      options.logger.debug(
+        `sharepoint.getContextInfo Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      options.logger.error(`sharepoint.getContextInfo Error:  ${err}`, loggingOptions);
+    });
+
+  await sharepoint
+    .addItem(options, { Title: 'Martin' })
+    .then((response) => {
+      options.logger.debug(
+        `sharepoint.addItem Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      options.logger.error(`sharepoint.addItem Error:  ${err}`, loggingOptions);
+    });
+
+  await sharepoint
     .getAllItems(
       options,
-      'EXAMPLE LIST',
       _.merge({}, basequery, {
         Filter: odatafilter()
           .fn('substringof', 'Title', 'Office', true, true)
@@ -117,7 +145,7 @@ const main = async (configOptions) => {
     });
 
   await sharepoint
-    .getAllItems(options, 'EXAMPLE LIST', _.merge({}, basequery))
+    .getAllItems(options, _.merge({}, basequery))
     .then((response) => {
       options.logger.debug(
         `sharepoint.getAllItems Response: ${stringifySafe(response.data)}`,
@@ -131,7 +159,6 @@ const main = async (configOptions) => {
   await sharepoint
     .getAllItems(
       options,
-      'EXAMPLE LIST',
       _.merge({}, basequery, {
         Filter: odatafilter().eq('MODALITY', 'READ').toString(),
       })
