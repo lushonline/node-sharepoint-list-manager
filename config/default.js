@@ -6,8 +6,6 @@ config.startTimestamp = moment().utc().format('YYYYMMDD_HHmmss');
 
 // DEBUG Options
 config.debug = {};
-// One of the supported default logging levels for winston - see https://github.com/winstonjs/winston#logging-levels
-config.debug.loggingLevel = 'info';
 config.debug.path = 'results';
 config.debug.filename = defer((cfg) => {
   return `${cfg.startTimestamp}_results.log`;
