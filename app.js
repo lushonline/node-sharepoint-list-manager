@@ -1,11 +1,14 @@
 require('dotenv-safe').config();
-const $REST = require('gd-sprest');
+
+const Axios = require('axios');
 const config = require('config');
 const fs = require('fs');
 const Path = require('path');
 const _ = require('lodash');
 const mkdirp = require('mkdirp');
 const stringifySafe = require('json-stringify-safe');
+const rateLimit = require('axios-rate-limit');
+const rax = require('retry-axios');
 const { accessSafe } = require('access-safe');
 
 const { transports } = require('winston');
@@ -14,6 +17,8 @@ const odatafilter = require('odata-filter-builder').ODataFilterBuilder;
 
 const sharepoint = require('./lib/sharepoint');
 const logger = require('./lib/logger');
+const timingAdapter = require('./lib/timingAdapter');
+
 const pjson = require('./package.json');
 
 /**
@@ -81,6 +86,76 @@ const main = async (configOptions) => {
 
   options.logger.info('Running task', loggingOptions);
 
+  // Create an axios instance that this will allow us to replace
+  // with ratelimiting
+  // see https://github.com/aishek/axios-rate-limit
+  const axiosInstance = rateLimit(Axios.create({ adapter: timingAdapter }), options.ratelimit);
+
+  // Add Axios Retry
+  // see https://github.com/JustinBeckwith/retry-axios
+  axiosInstance.defaults.raxConfig = _.merge(
+    {},
+    {
+      instance: axiosInstance,
+      // You can detect when a retry is happening, and figure out how many
+      // retry attempts have been made
+      onRetryAttempt: (err) => {
+        const raxcfg = rax.getConfig(err);
+        logger.warn(
+          `CorrelationId: ${err.config.correlationid}. Retry attempt #${raxcfg.currentRetryAttempt}`,
+          {
+            label: 'onRetryAttempt',
+          }
+        );
+      },
+      // Override the decision making process on if you should retry
+      shouldRetry: (err) => {
+        const cfg = rax.getConfig(err);
+        // ensure max retries is always respected
+        if (cfg.currentRetryAttempt >= cfg.retry) {
+          logger.warn(`CorrelationId: ${err.config.correlationid}. Maximum retries reached.`, {
+            label: `shouldRetry`,
+          });
+          return false;
+        }
+
+        // ensure max retries for NO RESPONSE errors is always respected
+        if (cfg.currentRetryAttempt >= cfg.noResponseRetries) {
+          logger.warn(
+            `CorrelationId: ${err.config.correlationid}. Maximum retries reached for No Response Errors.`,
+            {
+              label: `shouldRetry`,
+            }
+          );
+          return false;
+        }
+
+        // Always retry if response was not JSON
+        if (err.message.includes('Request did not return JSON')) {
+          logger.warn(
+            `CorrelationId: ${err.config.correlationid}. Request did not return JSON. Retrying.`,
+            {
+              label: `shouldRetry`,
+            }
+          );
+          return true;
+        }
+
+        // Handle the request based on your other config options, e.g. `statusCodesToRetry`
+        if (rax.shouldRetryRequest(err)) {
+          return true;
+        }
+
+        logger.error(`CorrelationId: ${err.config.correlationid}. None retryable error.`, {
+          label: `shouldRetry`,
+        });
+        return false;
+      },
+    },
+    options.rax
+  );
+  rax.attach(axiosInstance);
+
   await authenticate(options)
     .then((authresponse) => {
       options.logger.info(`Authenticated Successfully`, loggingOptions);
@@ -91,7 +166,7 @@ const main = async (configOptions) => {
     });
 
   await sharepoint
-    .getContextInfo(options)
+    .getContextInfo(options, axiosInstance)
     .then((response) => {
       options.sharepoint.authheaders['X-RequestDigest'] = accessSafe(
         () => response.data.d.GetContextWebInformation.FormDigestValue,
@@ -106,7 +181,7 @@ const main = async (configOptions) => {
       options.logger.error(`sharepoint.getContextInfo Error:  ${err}`, loggingOptions);
     });
 
-/*   await sharepoint
+  /*   await sharepoint
     .createGenericList(options, 'Martin123456')
     .then((response) => {
       options.logger.info(
@@ -118,7 +193,7 @@ const main = async (configOptions) => {
       options.logger.error(`sharepoint.createGenericList Error:  ${err}`, loggingOptions);
     }); */
 
-  await sharepoint
+  /*   await sharepoint
     .addFieldToList(options, 'Martin123456', {
       Title: 'Description',
       FieldTypeKind: $REST.SPTypes.FieldType.Text,
@@ -131,7 +206,7 @@ const main = async (configOptions) => {
     })
     .catch((err) => {
       options.logger.error(`sharepoint.addFieldToList Error:  ${err}`, loggingOptions);
-    });
+    }); */
 
   /*   await sharepoint
     .addItem(options, { Title: 'Martin' })
@@ -162,7 +237,7 @@ const main = async (configOptions) => {
 
   const basequery = {};
 
-  await sharepoint
+  /*   await sharepoint
     .upsertItems(
       options,
       [
@@ -180,7 +255,7 @@ const main = async (configOptions) => {
     .catch((err) => {
       const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
       options.logger.error(`sharepoint.upsertItems Error:  ${message}`, loggingOptions);
-    });
+    }); */
 
   /*   await sharepoint
     .getAllItems(
@@ -200,7 +275,7 @@ const main = async (configOptions) => {
     }); */
 
   await sharepoint
-    .getAllItems(options, _.merge({}, basequery))
+    .getAllItems(options, _.merge({}, basequery), axiosInstance)
     .then((response) => {
       options.logger.debug(
         `sharepoint.getAllItems Response: ${stringifySafe(response.data)}`,
@@ -220,7 +295,8 @@ const main = async (configOptions) => {
       options,
       _.merge({}, basequery, {
         Filter: odatafilter().eq('MODALITY', 'READ').toString(),
-      })
+      }),
+      axiosInstance
     )
     .then((response) => {
       options.logger.debug(
