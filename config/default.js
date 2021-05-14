@@ -27,6 +27,12 @@ config.sharepoint.username = null;
 config.sharepoint.password = null;
 // Sharepoint List Title
 config.sharepoint.list = null;
+// Sharepoint Timeout ms
+config.sharepoint.timeout = 5000;
+// Sharepoint Axios Client Debug
+// If false the response returned is the data, status/status text, timings.
+// If true teh request, config and other Axios values are returned as well.
+config.sharepoint.clientdebug = false;
 
 // Global Axios Retry Settings
 // see https://github.com/JustinBeckwith/retry-axios

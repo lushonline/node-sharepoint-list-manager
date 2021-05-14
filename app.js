@@ -10,14 +10,16 @@ const stringifySafe = require('json-stringify-safe');
 const rateLimit = require('axios-rate-limit');
 const rax = require('retry-axios');
 const { accessSafe } = require('access-safe');
+const $REST = require('gd-sprest');
 
 const { transports } = require('winston');
 const spauth = require('node-sp-auth');
 const odatafilter = require('odata-filter-builder').ODataFilterBuilder;
 
-const sharepoint = require('./lib/sharepoint');
 const logger = require('./lib/logger');
 const timingAdapter = require('./lib/timingAdapter');
+
+const { ListClient } = require('./lib/sharepoint/');
 
 const pjson = require('./package.json');
 
@@ -165,141 +167,87 @@ const main = async (configOptions) => {
       options.logger.error(`Error:  ${autherr}`, loggingOptions);
     });
 
-  await sharepoint
-    .getContextInfo(options, axiosInstance)
-    .then((response) => {
-      options.sharepoint.authheaders['X-RequestDigest'] = accessSafe(
-        () => response.data.d.GetContextWebInformation.FormDigestValue,
-        null
-      );
-      options.logger.debug(
-        `sharepoint.getContextInfo Response: ${stringifySafe(response)}`,
-        loggingOptions
-      );
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.getContextInfo Error:  ${err}`, loggingOptions);
-    });
+  const listClient = new ListClient(options, axiosInstance);
+  await listClient.getContextInfo();
 
-  /*   await sharepoint
-    .createGenericList(options, 'Martin123456')
-    .then((response) => {
-      options.logger.info(
-        `sharepoint.createGenericList Response: ${stringifySafe(response)}`,
-        loggingOptions
-      );
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.createGenericList Error:  ${err}`, loggingOptions);
-    }); */
-
-  /*   await sharepoint
-    .addFieldToList(options, 'Martin123456', {
-      Title: 'Description',
-      FieldTypeKind: $REST.SPTypes.FieldType.Text,
-    })
-    .then((response) => {
-      options.logger.info(
-        `sharepoint.addFieldToList Response: ${stringifySafe(response)}`,
-        loggingOptions
-      );
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.addFieldToList Error:  ${err}`, loggingOptions);
-    }); */
-
-  /*   await sharepoint
-    .addItem(options, { Title: 'Martin' })
+  await listClient
+    .getListInfo()
     .then((response) => {
       options.logger.debug(
-        `sharepoint.addItem Response: ${stringifySafe(response)}`,
-        loggingOptions
-      );
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.addItem Error:  ${err}`, loggingOptions);
-    }); */
-
-  /*   await sharepoint
-    .addItems(options, [{ Title: 'Martin1', DESCRIPTION: 'Test' }, { Title: 'Martin2' }])
-    .then((response) => {
-      const responses = [...response];
-      _.forEach(responses, (item) => {
-        options.logger.debug(
-          `sharepoint.addItems Response: ${stringifySafe(item.data)}`,
-          loggingOptions
-        );
-      });
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.addItems Error:  ${err}`, loggingOptions);
-    }); */
-
-  const basequery = {};
-
-  /*   await sharepoint
-    .upsertItems(
-      options,
-      [
-        { Title: 'Martin2', DESCRIPTION: 'Test2', LANGUAGE: 'Test2' },
-        { Title: 'Martin3', DESCRIPTION: 'Test3', LANGUAGE: 'Test3' },
-      ],
-      ['Title']
-    )
-    .then((response) => {
-      options.logger.debug(
-        `sharepoint.upsertItems Response: ${stringifySafe(response.data)}`,
+        `ListClient.getListInfo Response: ${stringifySafe(response.data.d)}`,
         loggingOptions
       );
     })
     .catch((err) => {
       const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
-      options.logger.error(`sharepoint.upsertItems Error:  ${message}`, loggingOptions);
-    }); */
+      options.logger.error(`ListClient.getListInfo Error:  ${message}`, loggingOptions);
+    });
 
-  /*   await sharepoint
+  await listClient
+    .upsertItems(
+      [
+        { Title: 'Martin22', DESCRIPTION: 'Test22', LANGUAGE: 'Test2' },
+        { Title: 'Martin33', DESCRIPTION: 'Test33', LANGUAGE: 'Test3' },
+      ],
+      ['Title']
+    )
+    .then((response) => {
+      options.logger.debug(
+        `ListClient.upsertItems Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
+      options.logger.error(`ListClient.upsertItems Error:  ${message}`, loggingOptions);
+    });
+
+  /* await listClient
+    .createList()
+    .then((response) => {
+      options.logger.info(
+        `ListClient.createList Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      options.logger.error(`ListClient.createList Error:  ${err}`, loggingOptions);
+    });
+
+  await listClient
+    .addField({
+      name: 'Martin Test Note1',
+      title: 'Martin Test Note1',
+      description: 'test',
+      type: $REST.Helper.SPCfgFieldType.Note,
+      noteType: $REST.SPTypes.FieldNoteType.EnhancedRichText,
+    })
+    .then((response) => {
+      options.logger.info(
+        `ListClient.addField Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      options.logger.error(`ListClient.addField Error:  ${err}`, loggingOptions);
+    });
+*/
+  const basequery = {};
+
+  // Example Filter Query
+  // Get records where title begins with
+  // { Filter: odatafilter().fn('substringof', 'Title', 'Martin', true, true).toString() };
+  // By specific modality
+  // {  Filter: odatafilter().eq('MODALITY', 'READ').toString() }
+
+  await listClient
     .getAllItems(
-      options,
       _.merge({}, basequery, {
         Filter: odatafilter().fn('substringof', 'Title', 'Martin', true, true).toString(),
       })
     )
     .then((response) => {
       options.logger.info(
-        `sharepoint.getAllItems Response: ${stringifySafe(response.data)}`,
-        loggingOptions
-      );
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.getAllItems Error:  ${err}`, loggingOptions);
-    }); */
-
-  await sharepoint
-    .getAllItems(options, _.merge({}, basequery), axiosInstance)
-    .then((response) => {
-      options.logger.debug(
-        `sharepoint.getAllItems Response: ${stringifySafe(response.data)}`,
-        loggingOptions
-      );
-      /*       const test = _.map(
-        accessSafe(() => response.data.d.results, []),
-        'UUID'
-      ); */
-    })
-    .catch((err) => {
-      options.logger.error(`sharepoint.getItems Error:  ${err}`, loggingOptions);
-    });
-
-  await sharepoint
-    .getAllItems(
-      options,
-      _.merge({}, basequery, {
-        Filter: odatafilter().eq('MODALITY', 'READ').toString(),
-      }),
-      axiosInstance
-    )
-    .then((response) => {
-      options.logger.debug(
         `sharepoint.getAllItems Response: ${stringifySafe(response.data)}`,
         loggingOptions
       );
