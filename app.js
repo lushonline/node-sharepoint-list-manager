@@ -10,7 +10,6 @@ const stringifySafe = require('json-stringify-safe');
 const rateLimit = require('axios-rate-limit');
 const rax = require('retry-axios');
 const { accessSafe } = require('access-safe');
-const $REST = require('gd-sprest');
 
 const { transports } = require('winston');
 const spauth = require('node-sp-auth');
@@ -169,7 +168,7 @@ const main = async (configOptions) => {
 
   const listClient = new ListClient(options, axiosInstance);
   await listClient.getContextInfo();
-
+  /*
   await listClient
     .getListInfo()
     .then((response) => {
@@ -182,24 +181,46 @@ const main = async (configOptions) => {
       const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
       options.logger.error(`ListClient.getListInfo Error:  ${message}`, loggingOptions);
     });
-
+*/
   await listClient
-    .upsertItems(
-      [
-        { Title: 'Martin22', DESCRIPTION: 'Test22', LANGUAGE: 'Test2' },
-        { Title: 'Martin33', DESCRIPTION: 'Test33', LANGUAGE: 'Test3' },
-      ],
-      ['Title']
-    )
+    .upsertItem({ Title: 'Martin22', DESCRIPTION: 'Test22', LANGUAGE: 'Test2' }, ['Title'])
     .then((response) => {
-      options.logger.debug(
-        `ListClient.upsertItems Response: ${stringifySafe(response)}`,
+      options.logger.info(
+        `ListClient.upsertItem Response: ${stringifySafe(response)}`,
         loggingOptions
       );
     })
     .catch((err) => {
       const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
-      options.logger.error(`ListClient.upsertItems Error:  ${message}`, loggingOptions);
+      options.logger.error(`ListClient.upsertItem Error:  ${message}`, loggingOptions);
+    });
+
+  let itemid = 696;
+  await listClient
+    .getItemByTitle('Martin22')
+    .then((response) => {
+      itemid = accessSafe(() => JSON.stringify(response.data.d.results[0].ID), 696);
+      options.logger.info(
+        `ListClient.getItemByTitle Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      const message = accessSafe(() => JSON.stringify(err.response.data), err.message);
+      options.logger.error(`ListClient.getItemByTitle Error:  ${message}`, loggingOptions);
+    });
+
+  await listClient
+    .deleteItemById(itemid)
+    .then((response) => {
+      options.logger.info(
+        `ListClient.deleteItemById Response: ${stringifySafe(response)}`,
+        loggingOptions
+      );
+    })
+    .catch((err) => {
+      const message = accessSafe(() => err.sperr.message.value, err.message);
+      options.logger.error(`ListClient.deleteItemById Error:  ${message}`, loggingOptions);
     });
 
   /* await listClient
@@ -240,7 +261,7 @@ const main = async (configOptions) => {
   // By specific modality
   // {  Filter: odatafilter().eq('MODALITY', 'READ').toString() }
 
-  await listClient
+  /*await listClient
     .getAllItems(
       _.merge({}, basequery, {
         Filter: odatafilter().fn('substringof', 'Title', 'Martin', true, true).toString(),
@@ -255,6 +276,7 @@ const main = async (configOptions) => {
     .catch((err) => {
       options.logger.error(`sharepoint.getAllItems Error:  ${err}`, loggingOptions);
     });
+    */
 
   options.logger.info(`End ${pjson.name} - v${pjson.version}`, loggingOptions);
   return true;
